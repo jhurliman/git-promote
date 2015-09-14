@@ -1,0 +1,23 @@
+{
+  "name": "git-promote",
+  "version": "1.0.0",
+  "description": "git extension to squash merge pull requests into master",
+  "main": "git-promote",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jhurliman/git-promote.git"
+  },
+  "keywords": [
+    "git",
+    "cli"
+  ],
+  "bin": {
+    "git-promote": "git-promote"
+  },
+  "author": "John Hurliman <jhurliman@jhurliman.org>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jhurliman/git-promote/issues"
+  },
+  "homepage": "https://github.com/jhurliman/git-promote"
+}

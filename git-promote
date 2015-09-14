@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+R="\x1B[1;31m"
+G="\x1B[1;32m"
+W="\x1B[0m"
+
+error () { echo -e "${R}$1${W}"; exit 1; }
+
+################################################################################
+
+TARGET=master
+
+# Sanity check
+GIT_DIR=$(git rev-parse --git-dir) || error "Cannot find a git directory in the current folder"
+
+# Check the pull request number command line argument
+RE='^[0-9]+$'
+if ! [[ $1 =~ $RE ]]; then
+  error "Missing required pull request number"
+fi
+
+# Make sure there are no unstaged changes
+if ! git diff-files --quiet --ignore-submodules --; then
+  git diff-files --name-status -r --ignore-submodules -- >&2
+  error "Aborting, you have unstaged changes"
+fi
+
+# Fetch the pull request into a local branch and switch to it
+git pull origin pull/$1/head:pullrequest-$1 || error "Failed to retrieve pull request $1"
+git checkout pullrequest-$1 || error "Failed to checkout branch pullrequest-$1"
+
+# Prompt for a new commit message
+while [[ -z "$COMMIT_TITLE" ]]; do
+  echo
+  echo -en "${G}Enter the final commit title:${W} "
+  read COMMIT_TITLE
+done
+
+# Retrieve the pull request branch again just in case
+git pull origin pull/$1/head:pullrequest-$1 || error "Failed to retrieve pull request $1"
+
+# Make sure we have an up-to-date copy of the target branch and switch to it
+git pull origin "$TARGET" || error "Could not successfully pull $TARGET"
+git checkout "$TARGET" || error "Failed to checkout $TARGET"
+
+# Do the squash merge into the target branch
+git merge --squash "pullrequest-$1"
+
+# Prepend the commit message
+SQUASH_MSG="$GIT_DIR/SQUASH_MSG"
+TMP_MSG=$(mktemp -t gitsquash) || error "mktemp failed"
+echo -e "$COMMIT_TITLE [closes #$1]\n" | cat - "$SQUASH_MSG" > "$TMP_MSG" && mv "$TMP_MSG" "$SQUASH_MSG"
+
+# Commit to the target branch, push, and delete the local pull request branch
+git commit || error "Failed to commit the squash merge into $TARGET"
+git push origin "$TARGET" || error "Failed to push $TARGET upstream"
+git branch -D pullrequest-$1 || error "Failed to delete branch pullrequest-$1"
+
+echo
+echo -e "${R}\xE2\x9D\xA4 ${G}Success! Promoted PR#$1 to $TARGET${W}"
+echo
+git log --max-count=5 --color --graph --no-pager --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
